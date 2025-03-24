@@ -1,111 +1,203 @@
-import React, { useReducer, useState, useEffect, useCallback, useRef, useMemo } from "react";
-import "../styles/TaskManager.css"; // Ensure correct import
-
-// 🎯 Reducer function for managing tasks
-const taskReducer = (state, action) => {
-    let updatedTasks;
-    switch (action.type) {
-        case "LOAD_TASKS":
-            return action.payload;
-        case "ADD_TASK":
-            updatedTasks = [...state, { id: Date.now(), ...action.payload }];
-            break;
-        case "UPDATE_TASK":
-            updatedTasks = state.map(task =>
-                task.id === action.payload.id ? { ...task, ...action.payload } : task
-            );
-            break;
-        case "DELETE_TASK":
-            updatedTasks = state.filter(task => task.id !== action.payload);
-            break;
-        case "TOGGLE_COMPLETION":
-            updatedTasks = state.map(task =>
-                task.id === action.payload ? { ...task, completed: !task.completed } : task
-            );
-            break;
-        default:
-            return state;
-    }
-
-    // Update local storage whenever tasks change
-    localStorage.setItem("tasks", JSON.stringify(updatedTasks));
-    return updatedTasks;
-};
+// components/TaskManager.js
+import React, { useState, useRef, useMemo, useCallback } from "react";
+import { useTasks } from "../context/TaskContext";
+import { useTheme } from "../context/ThemeContext";
 
 const TaskManager = () => {
-    const [tasks, dispatch] = useReducer(taskReducer, [], () => {
-        return JSON.parse(localStorage.getItem("tasks")) || [];
-    });
+    const { tasks, dispatch } = useTasks();
+    const { theme, toggleTheme } = useTheme();
 
-    const [taskInput, setTaskInput] = useState({ title: "", description: "" });
-    const [modalOpen, setModalOpen] = useState(false);
-    const titleInputRef = useRef(null);
+    const [title, setTitle] = useState("");
+    const [description, setDescription] = useState("");
+    const inputRef = useRef(null);
+    const [filter, setFilter] = useState("all");
 
-    // Auto-focus input when modal opens
-    useEffect(() => {
-        if (modalOpen) setTimeout(() => titleInputRef.current?.focus(), 100);
-    }, [modalOpen]);
+    React.useEffect(() => {
+        inputRef.current.focus();
+    }, []);
+
+    const filteredTasks = useMemo(() => {
+        let filtered = tasks;
+        if (filter === "completed") {
+            filtered = tasks.filter((task) => task.completed);
+        } else if (filter === "pending") {
+            filtered = tasks.filter((task) => !task.completed);
+        }
+        return filtered.filter((task) =>
+            task.title.toLowerCase().includes(title.toLowerCase())
+        );
+    }, [tasks, title, filter]);
 
     const addTask = useCallback(() => {
-        if (!taskInput.title.trim()) return;
-        dispatch({ type: "ADD_TASK", payload: { ...taskInput, completed: false } });
-        setTaskInput({ title: "", description: "" });
-        setModalOpen(false);
-    }, [taskInput]);
-
-    const updateTask = useCallback((id) => {
-        const updatedTitle = prompt("New Title", tasks.find(task => task.id === id)?.title);
-        const updatedDescription = prompt("New Description", tasks.find(task => task.id === id)?.description);
-        if (updatedTitle && updatedDescription) {
-            dispatch({ type: "UPDATE_TASK", payload: { id, title: updatedTitle, description: updatedDescription } });
+        if (title.trim() === "" || description.trim() === "") {
+            alert("Please enter a title and description!");
+            return;
         }
-    }, [tasks]);
 
-    const deleteTask = useCallback((id) => dispatch({ type: "DELETE_TASK", payload: id }), []);
-    const toggleCompletion = useCallback((id) => dispatch({ type: "TOGGLE_COMPLETION", payload: id }), []);
+        dispatch({
+            type: "ADD_TASK",
+            payload: { id: Date.now(), title, description, completed: false },
+        });
 
-    const filteredTasks = useMemo(() => tasks.filter(task => !task.completed), [tasks]);
+        setTitle("");
+        setDescription("");
+    }, [title, description, dispatch]);
+
+    const deleteTask = useCallback((id) => {
+        dispatch({ type: "DELETE_TASK", payload: id });
+    }, [dispatch]);
+
+    const toggleComplete = useCallback((id) => {
+        dispatch({ type: "TOGGLE_COMPLETE", payload: id });
+    }, [dispatch]);
+
+    const undoTask = useCallback((id) => {
+        dispatch({ type: "UNDO_TASK", payload: id });
+    }, [dispatch]);
+
+    const styles = {
+        container: {
+            maxWidth: "600px",
+            margin: "auto",
+            padding: "20px",
+            border: `1px solid ${theme === "light" ? "#ccc" : "#444"}`,
+            borderRadius: "8px",
+            textAlign: "center",
+            backgroundColor: theme === "light" ? "#fff" : "#333",
+            color: theme === "light" ? "#000" : "#fff",
+        },
+        input: {
+            width: "90%",
+            padding: "10px",
+            margin: "5px 0",
+            borderRadius: "5px",
+            border: `1px solid ${theme === "light" ? "#ccc" : "#444"}`,
+            backgroundColor: theme === "light" ? "#fff" : "#555",
+            color: theme === "light" ? "#000" : "#fff",
+        },
+        button: {
+            padding: "10px 15px",
+            backgroundColor: "#007BFF",
+            color: "#fff",
+            border: "none",
+            borderRadius: "5px",
+            cursor: "pointer",
+        },
+        list: {
+            listStyleType: "none",
+            padding: 0,
+            marginTop: "10px",
+        },
+        taskItem: {
+            border: `1px solid ${theme === "light" ? "#ddd" : "#555"}`,
+            padding: "10px",
+            borderRadius: "5px",
+            marginBottom: "5px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            backgroundColor: theme === "light" ? "#f9f9f9" : "#444",
+        },
+        taskContent: {
+            flexGrow: 1,
+            textAlign: "left",
+        },
+        actionButtons: {
+            display: "flex",
+        },
+        filterButtons: {
+            display: "flex",
+            justifyContent: "center",
+            margin: "10px 0",
+        },
+        filterButton: {
+            padding: "5px 10px",
+            margin: "0 5px",
+            borderRadius: "5px",
+            border: `1px solid ${theme === "light" ? "#ccc" : "#444"}`,
+            backgroundColor: theme === "light" ? "#e0e0e0" : "#666",
+            color: theme === "light" ? "#000" : "#fff",
+            cursor: "pointer",
+        },
+        toggleButton: {
+            padding: "10px 15px",
+            backgroundColor: theme === "light" ? "#000" : "#fff",
+            color: theme === "light" ? "#fff" : "#000",
+            border: "none",
+            borderRadius: "5px",
+            cursor: "pointer",
+        },
+    };
 
     return (
-        <div className="task-manager">
+        <div style={styles.container}>
             <h2>Task Manager</h2>
-            <button className="add-task-btn" onClick={() => setModalOpen(true)}>+ Add Task</button>
-
-            {modalOpen && (
-                <div className="modal-overlay">
-                    <div className="modal">
-                        <h3>Add New Task</h3>
-                        <input
-                            ref={titleInputRef}
-                            type="text"
-                            placeholder="Task Title"
-                            value={taskInput.title}
-                            onChange={(e) => setTaskInput({ ...taskInput, title: e.target.value })}
-                        />
-                        <textarea
-                            placeholder="Task Description"
-                            value={taskInput.description}
-                            onChange={(e) => setTaskInput({ ...taskInput, description: e.target.value })}
-                        />
-                        <div className="modal-actions">
-                            <button className="save-btn" onClick={addTask}>Save</button>
-                            <button className="cancel-btn" onClick={() => setModalOpen(false)}>Cancel</button>
+            <button onClick={toggleTheme} style={styles.toggleButton}>
+                {theme === "light" ? "Dark Mode" : "Light Mode"}
+            </button>
+            <input
+                type="text"
+                ref={inputRef}
+                placeholder="Task Title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                style={styles.input}
+            />
+            <input
+                type="text"
+                placeholder="Task Description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                style={styles.input}
+            />
+            <button onClick={addTask} style={styles.button}>
+                Add Task
+            </button>
+            <div style={styles.filterButtons}>
+                <button
+                    onClick={() => setFilter("all")}
+                    style={{
+                        ...styles.filterButton,
+                        backgroundColor: filter === "all" ? "#007BFF" : styles.filterButton.backgroundColor,
+                    }}
+                >
+                    All
+                </button>
+                <button
+                    onClick={() => setFilter("completed")}
+                    style={{
+                        ...styles.filterButton,
+                        backgroundColor: filter === "completed" ? "#007BFF" : styles.filterButton.backgroundColor,
+                    }}
+                >
+                    Completed
+                </button>
+                <button
+                    onClick={() => setFilter("pending")}
+                    style={{
+                        ...styles.filterButton,
+                        backgroundColor: filter === "pending" ? "#007BFF" : styles.filterButton.backgroundColor,
+                    }}
+                >
+                    Pending
+                </button>
+            </div>
+            <ul style={styles.list}>
+                {filteredTasks.map((task) => (
+                    <li key={task.id} style={styles.taskItem}>
+                        <div style={styles.taskContent}>
+                            {task.title}
+                            {task.completed && <span style={{ marginLeft: "10px", color: "green" }}>Completed</span>}
                         </div>
-                    </div>
-                </div>
-            )}
-
-            <ul className="task-list">
-                {filteredTasks.map(task => (
-                    <li key={task.id} className={`task-card ${task.completed ? "completed" : ""}`}>
-                        <div className="task-content">
-                            <h4>{task.title}</h4>
-                            <p>{task.description}</p>
-                        </div>
-                        <div className="task-actions">
-                            <button className="complete-btn" onClick={() => toggleCompletion(task.id)}>✔</button>
-                            <button className="edit-btn" onClick={() => updateTask(task.id)}>✎</button>
-                            <button className="delete-btn" onClick={() => deleteTask(task.id)}>🗑</button>
+                        <div style={styles.actionButtons}>
+                            {!task.completed && (
+                                <button onClick={() => toggleComplete(task.id)}>Complete</button>
+                            )}
+                            {task.completed && (
+                                <button onClick={() => undoTask(task.id)}>Undo</button>
+                            )}
+                            <button>Edit</button>
+                            <button onClick={() => deleteTask(task.id)}>Delete</button>
                         </div>
                     </li>
                 ))}
